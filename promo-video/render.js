@@ -1,6 +1,7 @@
 // Renderiza index.html frame a frame e gera o MP4 via ffmpeg.
-// Uso: node render.js                 -> out/felipe-leal-promo.mp4 + out/capa.png
-//      node render.js --stills 1.2,5  -> PNGs de teste em out/stills/
+// Uso: node render.js                 -> out/felipe-leal-promo.mp4 (sem legenda/voz) + out/capa.png
+//      node render.js --narrado       -> out/felipe-leal-promo-narrado.mp4 (legendas + out/narracao.wav)
+//      node render.js --stills 1.2,5  -> PNGs de teste em out/stills/ (com legendas)
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -18,8 +19,9 @@ const OUT = path.join(__dirname, 'out');
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(() => Promise.all([...document.fonts].map(f => f.load())));
 
-  const shot = async (t, file) => {
-    await page.evaluate(t => window.render(t), t);
+  const narrado = process.argv.includes('--narrado');
+  const shot = async (t, file, captions = true) => {
+    await page.evaluate(([t, captions]) => window.render(t, { captions }), [t, captions]);
     return page.screenshot({ path: file, type: 'png' });
   };
 
@@ -30,19 +32,20 @@ const OUT = path.join(__dirname, 'out');
     await browser.close(); return;
   }
 
-  const mp4 = path.join(OUT, 'felipe-leal-promo.mp4');
+  const mp4 = path.join(OUT, narrado ? 'felipe-leal-promo-narrado.mp4' : 'felipe-leal-promo.mp4');
+  const audio = narrado ? ['-i', path.join(OUT, 'narracao.wav'), '-map', '0:v', '-map', '1:a', '-c:a', 'aac', '-b:a', '192k', '-shortest'] : [];
   const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-r', String(FPS),
+    ...audio, '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-r', String(FPS),
     '-movflags', '+faststart', mp4], { stdio: ['pipe', 'inherit', 'inherit'] });
   const total = FPS * DURATION;
   for (let i = 0; i < total; i++) {
-    const buf = await shot(i / FPS);
+    const buf = await shot(i / FPS, undefined, narrado);
     if (!ff.stdin.write(buf)) await new Promise(r => ff.stdin.once('drain', r));
     if (i % 60 === 0) process.stdout.write(`frame ${i}/${total}\n`);
   }
   ff.stdin.end();
   await new Promise(r => ff.on('close', r));
-  await shot(COVER_T, path.join(OUT, 'capa.png'));
+  if (!narrado) await shot(COVER_T, path.join(OUT, 'capa.png'), false);
   await browser.close();
   console.log('ok ->', mp4);
 })();

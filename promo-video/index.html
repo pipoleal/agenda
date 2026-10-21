@@ -98,6 +98,13 @@ svg{overflow:visible}
 #foot{top:1372px;font-family:var(--mono);font-size:26px;letter-spacing:5px;color:rgba(241,245,249,.55);display:flex;align-items:center;justify-content:center;gap:22px}
 #foot i{display:block;width:60px;height:2px;background:rgba(56,189,248,.5)}
 
+/* legendas da narração */
+#cap{position:absolute;left:120px;width:840px;top:1440px;display:flex;justify-content:center;pointer-events:none}
+#capbox{font-family:var(--sans);font-weight:700;font-size:50px;line-height:1.2;color:var(--ice);text-align:center;
+  padding:14px 28px;border-radius:24px;background:rgba(7,11,26,.8);border:2px solid rgba(56,189,248,.28);
+  box-shadow:0 10px 40px rgba(0,0,0,.35)}
+#capbox span{display:inline-block;margin:0 .14em;transition:none}
+#capbox span.on{color:var(--cyan)}
 #glitch{position:absolute;inset:0;pointer-events:none}
 #glitch div{position:absolute;left:0;right:0;mix-blend-mode:screen}
 </style>
@@ -306,9 +313,11 @@ svg{overflow:visible}
     </div>
 
   </div>
+  <div id="cap"><div id="capbox"></div></div>
   <div id="glitch"></div>
 </div>
 
+<script src="captions.js" onerror="window.CAPTIONS=null"></script>
 <script>
 const W=1080,H=1920,FPS=30,DURATION=38;
 const $=id=>document.getElementById(id);
@@ -454,9 +463,44 @@ function rocketPos(t){
   return {x,y};
 }
 
+/* ---------- legendas ---------- */
+// agrupa as palavras de cada fala em blocos curtos (até 4 palavras / 28 caracteres)
+const CAPG=[];
+for(const seg of (window.CAPTIONS||[])){
+  let g=[];
+  const flush=()=>{if(g.length)CAPG.push(g);g=[]};
+  for(const w of seg.words){
+    const len=g.reduce((a,x)=>a+x.w.length+1,0)+w.w.length;
+    if(g.length&&(g.length>=4||len>28))flush();
+    g.push(w);
+    if(/[.?!:]$|\.\.\.$/.test(w.w))flush();
+  }
+  flush();
+}
+CAPG.forEach((g,i)=>{g.t0=g[0].t0-.04;const nx=CAPG[i+1];g.t1=Math.min(g[g.length-1].t1+.35,nx?nx[0].t0-.04:1e9)});
+let capOn=!location.search.includes('nocap');
+const capbox=$('capbox');let capIdx=-1;
+function drawCaptions(t){
+  const i=capOn?CAPG.findIndex(g=>t>=g.t0&&t<g.t1):-1;
+  if(i<0){$('cap').style.opacity=0;capIdx=-1;return}
+  const g=CAPG[i];
+  if(i!==capIdx){capbox.innerHTML=g.map(w=>`<span>${w.w}</span>`).join('');capIdx=i}
+  [...capbox.children].forEach((sp,j)=>{
+    const w=g[j],nx=g[j+1];
+    const on=t>=w.t0&&(nx?t<nx.t0:true);
+    sp.className=on?'on':'';
+    const k=E.out(p(t,w.t0,w.t0+.12));
+    sp.style.transform=on?`scale(${lerp(1.12,1.06,k)})`:'none';
+  });
+  const k=E.out(p(t,g.t0,g.t0+.14));
+  $('cap').style.opacity=1;
+  $('cap').style.transform=`translateY(${lerp(14,0,k)}px) scale(${lerp(.94,1,k)})`;
+}
+
 /* ---------- render ---------- */
 const SC=[['s1',0,4],['s2',4,10],['s3',10,14],['s4',14,26],['s5',26,30],['s6',30,33],['s7',33,99]];
-function render(t){
+function render(t,opts){
+  if(opts&&'captions' in opts)capOn=opts.captions;
   drawRain(t);
   for(const [id,a,b] of SC)$(id).style.display=(t>=a&&t<b)?'block':'none';
 
@@ -638,6 +682,7 @@ function render(t){
     slideFade($('foot'),t,34.85,99,{dy:20});
   }
 
+  drawCaptions(t);
   drawGlitch(t);
 }
 window.render=render;
