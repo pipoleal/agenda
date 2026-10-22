@@ -15,6 +15,9 @@ Motion graphics 1080×1920 (9:16), 30 fps, 38 s, sem áudio.
   - `python3 narration.py <pasta-dos-modelos> [sid]` (43 = masculina, 42 = feminina), depois masterizar:
     `ffmpeg -i out/narracao_raw.wav -af "highpass=f=75,equalizer=f=180:t=q:w=1:g=2,equalizer=f=6500:t=q:w=1.5:g=-2.5,acompressor=threshold=-20dB:ratio=2:attack=8:release=150,aecho=0.9:0.7:17|31:0.07|0.04,loudnorm=I=-16:TP=-1.5:LRA=9" -ar 48000 -ac 1 out/narracao.wav`
   - Prévia sem legenda: `index.html?play&nocap`.
+- `voice_sync.py` — usa uma narração gravada (voz real): limpa o áudio, recorta cada fala, encaixa
+  no tempo da cena e gera o `captions.js`. `python3 voice_sync.py gravacao.m4a` e depois
+  `node render.js --narrado`. Versão final com a voz do Felipe: `out/felipe-leal-promo-voz-felipe.mp4`.
 - `fonts/` — Space Mono e Quicksand (SIL Open Font License, via Fontsource).
 
 Zona segura respeitada: nada importante nos 250 px de cima, 350 px de baixo e 120 px da direita.
