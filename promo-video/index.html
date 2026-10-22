@@ -101,9 +101,9 @@ svg{overflow:visible}
 /* legendas da narração */
 #cap{position:absolute;left:120px;width:840px;top:1440px;display:flex;justify-content:center;pointer-events:none}
 #capbox{font-family:var(--sans);font-weight:700;font-size:50px;line-height:1.2;color:var(--ice);text-align:center;
-  padding:14px 28px;border-radius:24px;background:rgba(7,11,26,.8);border:2px solid rgba(56,189,248,.28);
+  padding:14px 28px;border-radius:24px;white-space:nowrap;background:rgba(7,11,26,.8);border:2px solid rgba(56,189,248,.28);
   box-shadow:0 10px 40px rgba(0,0,0,.35)}
-#capbox span{display:inline-block;margin:0 .14em;transition:none}
+#capbox span{display:inline-block;margin:0 .2em;transition:none}
 #capbox span.on{color:var(--cyan)}
 #glitch{position:absolute;inset:0;pointer-events:none}
 #glitch div{position:absolute;left:0;right:0;mix-blend-mode:screen}
@@ -464,18 +464,25 @@ function rocketPos(t){
 }
 
 /* ---------- legendas ---------- */
-// agrupa as palavras de cada fala em blocos curtos (até 4 palavras / 28 caracteres)
+// agrupa as palavras de cada fala em blocos curtos: quebra na pontuação e divide
+// trechos longos em partes equilibradas (até 6 palavras / 30 caracteres)
 const CAPG=[];
+const fits=g=>g.length<=6&&g.map(w=>w.w).join(' ').length<=30;
+const WEAK=/^(e|o|a|os|as|de|do|da|em|pro|pra|que|seu|sua)$/i;
 for(const seg of (window.CAPTIONS||[])){
-  let g=[];
-  const flush=()=>{if(g.length)CAPG.push(g);g=[]};
-  for(const w of seg.words){
-    const len=g.reduce((a,x)=>a+x.w.length+1,0)+w.w.length;
-    if(g.length&&(g.length>=4||len>28))flush();
-    g.push(w);
-    if(/[.?!:]$|\.\.\.$/.test(w.w))flush();
+  const chunks=[];let cur=[];
+  for(const w of seg.words){cur.push(w);if(/[,.?!:]$/.test(w.w)){chunks.push(cur);cur=[]}}
+  if(cur.length)chunks.push(cur);
+  // junta trechos curtos vizinhos se couberem num bloco só
+  const merged=[];
+  for(const c of chunks){const last=merged[merged.length-1];if(last&&fits([...last,...c])&&!/[.?!]$/.test(last[last.length-1].w))merged[merged.length-1]=[...last,...c];else merged.push(c)}
+  for(const c of merged){
+    let n=1;while(n<c.length&&!Array.from({length:n},(_,k)=>c.slice(Math.round(k*c.length/n),Math.round((k+1)*c.length/n))).every(fits))n++;
+    const parts=Array.from({length:n},(_,k)=>c.slice(Math.round(k*c.length/n),Math.round((k+1)*c.length/n)));
+    // não termina bloco em palavra de ligação ("e", "de", "que"...): passa ela pro bloco seguinte
+    for(let k=0;k<parts.length-1;k++)while(parts[k].length>1&&WEAK.test(parts[k][parts[k].length-1].w))parts[k+1].unshift(parts[k].pop());
+    CAPG.push(...parts);
   }
-  flush();
 }
 CAPG.forEach((g,i)=>{g.t0=g[0].t0-.04;const nx=CAPG[i+1];g.t1=Math.min(g[g.length-1].t1+.35,nx?nx[0].t0-.04:1e9)});
 let capOn=!location.search.includes('nocap');
@@ -484,13 +491,18 @@ function drawCaptions(t){
   const i=capOn?CAPG.findIndex(g=>t>=g.t0&&t<g.t1):-1;
   if(i<0){$('cap').style.opacity=0;capIdx=-1;return}
   const g=CAPG[i];
-  if(i!==capIdx){capbox.innerHTML=g.map(w=>`<span>${w.w}</span>`).join('');capIdx=i}
+  if(i!==capIdx){
+    capbox.innerHTML=g.map(w=>`<span>${w.w}</span>`).join('');capIdx=i;
+    // sempre numa linha: reduz a fonte se o bloco passar da largura útil
+    let fs=50;capbox.style.fontSize=fs+'px';
+    while(capbox.offsetWidth>840&&fs>38){fs-=2;capbox.style.fontSize=fs+'px'}
+  }
   [...capbox.children].forEach((sp,j)=>{
     const w=g[j],nx=g[j+1];
     const on=t>=w.t0&&(nx?t<nx.t0:true);
     sp.className=on?'on':'';
     const k=E.out(p(t,w.t0,w.t0+.12));
-    sp.style.transform=on?`scale(${lerp(1.12,1.06,k)})`:'none';
+    sp.style.transform=on?`scale(${lerp(1.08,1.03,k)})`:'none';
   });
   const k=E.out(p(t,g.t0,g.t0+.14));
   $('cap').style.opacity=1;

@@ -13,7 +13,7 @@ Motion graphics 1080×1920 (9:16), 30 fps, 38 s, sem áudio.
   e o `captions.js` com o tempo de cada palavra (legenda com a palavra falada em destaque).
   - `pip install sherpa-onnx soundfile numpy`; modelo `kokoro-multi-lang-v1_0` dos releases do sherpa-onnx (tts-models).
   - `python3 narration.py <pasta-dos-modelos> [sid]` (43 = masculina, 42 = feminina), depois masterizar:
-    `ffmpeg -i out/narracao_raw.wav -af "highpass=f=70,acompressor=threshold=-20dB:ratio=2.5:attack=5:release=120,loudnorm=I=-16:TP=-1.5:LRA=9" -ar 48000 -ac 1 out/narracao.wav`
+    `ffmpeg -i out/narracao_raw.wav -af "highpass=f=75,equalizer=f=180:t=q:w=1:g=2,equalizer=f=6500:t=q:w=1.5:g=-2.5,acompressor=threshold=-20dB:ratio=2:attack=8:release=150,aecho=0.9:0.7:17|31:0.07|0.04,loudnorm=I=-16:TP=-1.5:LRA=9" -ar 48000 -ac 1 out/narracao.wav`
   - Prévia sem legenda: `index.html?play&nocap`.
 - `fonts/` — Space Mono e Quicksand (SIL Open Font License, via Fontsource).
 
